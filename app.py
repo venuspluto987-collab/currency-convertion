@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-from forex_python.converter import CurrencyRates
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(
@@ -12,7 +11,7 @@ st.set_page_config(
 st.markdown("""
 <style>
 
-/* App */
+/* Main App */
 .stApp {
     background-color: #f4f5f7;
     font-family: Arial, sans-serif;
@@ -95,6 +94,16 @@ tr:hover {
     background-color: #f9fbfd;
 }
 
+/* Success */
+.success-box {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    padding: 12px;
+    border-radius: 10px;
+    margin-top: 15px;
+    margin-bottom: 15px;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -110,10 +119,77 @@ uploaded_file = st.file_uploader(
     type=["csv", "xlsx"]
 )
 
+# ---------------- EXCHANGE RATES ----------------
+exchange_rates = {
+
+    "USD": {
+        "INR": 83.0,
+        "EUR": 0.92,
+        "AED": 3.67,
+        "GBP": 0.79,
+        "SGD": 1.35,
+        "JPY": 156.0
+    },
+
+    "INR": {
+        "USD": 0.012,
+        "EUR": 0.011,
+        "AED": 0.044,
+        "GBP": 0.0095,
+        "SGD": 0.016,
+        "JPY": 1.88
+    },
+
+    "EUR": {
+        "USD": 1.09,
+        "INR": 90.0,
+        "AED": 4.0,
+        "GBP": 0.86,
+        "SGD": 1.47,
+        "JPY": 170.0
+    },
+
+    "AED": {
+        "USD": 0.27,
+        "INR": 22.6,
+        "EUR": 0.25,
+        "GBP": 0.21,
+        "SGD": 0.37,
+        "JPY": 42.5
+    },
+
+    "GBP": {
+        "USD": 1.27,
+        "INR": 105.0,
+        "EUR": 1.16,
+        "AED": 4.67,
+        "SGD": 1.71,
+        "JPY": 198.0
+    },
+
+    "SGD": {
+        "USD": 0.74,
+        "INR": 61.0,
+        "EUR": 0.68,
+        "AED": 2.72,
+        "GBP": 0.58,
+        "JPY": 116.0
+    },
+
+    "JPY": {
+        "USD": 0.0064,
+        "INR": 0.53,
+        "EUR": 0.0059,
+        "AED": 0.024,
+        "GBP": 0.005,
+        "SGD": 0.0086
+    }
+}
+
 # ---------------- MAIN ----------------
 if uploaded_file is not None:
 
-    # Read file
+    # Read File
     try:
 
         if uploaded_file.name.endswith(".csv"):
@@ -152,7 +228,7 @@ if uploaded_file is not None:
         <thead>
         """
 
-        # First Row
+        # Header Row 1
         html += "<tr>"
 
         for d in dimensions:
@@ -166,7 +242,7 @@ if uploaded_file is not None:
 
         html += "</tr>"
 
-        # Second Row
+        # Header Row 2
         html += "<tr>"
 
         for col in ordered_cols:
@@ -204,21 +280,9 @@ if uploaded_file is not None:
     )
 
     # ---------------- CURRENCY SECTION ----------------
-    st.markdown(
-        '<div class="section-box">',
-        unsafe_allow_html=True
-    )
+    if "Currency" in df.columns:
 
-    st.subheader("Currency Conversion")
-
-    # Check Currency Column
-    if "Currency" not in df.columns:
-
-        st.warning(
-            "Currency column not found in uploaded file."
-        )
-
-    else:
+        st.subheader("Currency Conversion")
 
         currencies = sorted(
             df["Currency"].dropna().unique().tolist()
@@ -243,7 +307,6 @@ if uploaded_file is not None:
             include=["int64", "float64"]
         ).columns.tolist()
 
-        # Amount Column
         amount_col = st.selectbox(
             "Select Amount Column",
             numeric_cols
@@ -256,22 +319,22 @@ if uploaded_file is not None:
 
                 converted_df = df.copy()
 
-                # IMPORTANT FIX
+                # Convert amount column to float
                 converted_df[amount_col] = pd.to_numeric(
                     converted_df[amount_col],
                     errors="coerce"
                 ).astype(float)
 
-                # Currency API
-                c = CurrencyRates()
+                # Same Currency
+                if from_currency == to_currency:
+                    rate = 1
 
-                # Get Exchange Rate
-                rate = c.get_rate(
-                    from_currency,
-                    to_currency
-                )
+                else:
+                    rate = exchange_rates[
+                        from_currency
+                    ][to_currency]
 
-                # Convert ONLY selected currency rows
+                # Convert ONLY selected rows
                 mask = (
                     converted_df["Currency"]
                     == from_currency
@@ -287,16 +350,21 @@ if uploaded_file is not None:
                     ] * rate
                 ).round(2)
 
-                # Update currency
+                # Update Currency Column
                 converted_df.loc[
                     mask,
                     "Currency"
                 ] = to_currency
 
                 # Success Message
-                st.success(
-                    f"1 {from_currency} = "
-                    f"{rate:.2f} {to_currency}"
+                st.markdown(
+                    f"""
+                    <div class="success-box">
+                        1 {from_currency} =
+                        {rate:.2f} {to_currency}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
                 )
 
                 # Converted Table
@@ -310,7 +378,10 @@ if uploaded_file is not None:
             except Exception as e:
                 st.error(f"Conversion Error: {e}")
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    else:
+        st.warning(
+            "Currency column not found in uploaded file."
+        )
 
 else:
     st.info("Upload CSV or Excel File")
