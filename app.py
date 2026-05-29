@@ -2,42 +2,131 @@ import streamlit as st
 import pandas as pd
 from forex_python.converter import CurrencyRates
 
-# Page Config
+# ---------------- PAGE CONFIG ----------------
 st.set_page_config(
     page_title="SAC Style Currency Conversion",
     layout="wide"
 )
 
-# Load CSS
-with open("styles.css") as f:
-    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+# ---------------- CSS ----------------
+st.markdown("""
+<style>
 
-# Header
+/* App */
+.stApp {
+    background-color: #f4f5f7;
+    font-family: Arial, sans-serif;
+}
+
+/* Header */
+.main-title {
+    font-size: 38px;
+    color: #555;
+    margin-bottom: 20px;
+    font-weight: 500;
+}
+
+/* Upload Box */
+[data-testid="stFileUploader"] {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid #ddd;
+}
+
+/* Section Box */
+.section-box {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid #ddd;
+    margin-top: 20px;
+}
+
+/* Table */
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+/* Measure Group */
+.measure-group {
+    background-color: #f3f3f3;
+    text-align: center;
+    font-size: 24px;
+    color: #444;
+    height: 50px;
+    border-bottom: 2px solid #ddd;
+}
+
+/* Blank Header */
+.blank-head {
+    background-color: #f3f3f3;
+    border-bottom: 2px solid #ddd;
+}
+
+/* Dimension Header */
+.dimension-col {
+    background-color: #fafafa;
+    padding: 14px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+    font-size: 18px;
+}
+
+/* Measure Header */
+.measure-col {
+    background-color: #fafafa;
+    padding: 14px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+    font-size: 18px;
+}
+
+/* Table Cell */
+td {
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+    font-size: 16px;
+}
+
+/* Hover */
+tr:hover {
+    background-color: #f9fbfd;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# ---------------- TITLE ----------------
 st.markdown(
-    """
-    <div class="top-header">
-        New_Analytic_Model
-    </div>
-    """,
+    '<div class="main-title">New_Analytic_Model</div>',
     unsafe_allow_html=True
 )
 
-# Upload File
+# ---------------- FILE UPLOAD ----------------
 uploaded_file = st.file_uploader(
     "Upload CSV or Excel File",
     type=["csv", "xlsx"]
 )
 
+# ---------------- MAIN ----------------
 if uploaded_file is not None:
 
     # Read file
-    if uploaded_file.name.endswith(".csv"):
-        df = pd.read_csv(uploaded_file)
+    try:
 
-    else:
-        df = pd.read_excel(uploaded_file)
+        if uploaded_file.name.endswith(".csv"):
+            df = pd.read_csv(uploaded_file)
 
-    # Detect Dimensions & Measures
+        else:
+            df = pd.read_excel(uploaded_file)
+
+    except Exception as e:
+        st.error(f"File Read Error: {e}")
+        st.stop()
+
+    # ---------------- DETECT DIMENSIONS & MEASURES ----------------
     dimensions = []
     measures = []
 
@@ -52,181 +141,174 @@ if uploaded_file is not None:
         else:
             dimensions.append(col)
 
-    # Arrange columns
     ordered_cols = dimensions + measures
 
-    # SAC Style Table
-    html = """
-    <div class="table-wrapper">
-    <table>
-    <thead>
-    """
+    # ---------------- TABLE FUNCTION ----------------
+    def build_table(dataframe):
 
-    # First Header Row
-    html += "<tr>"
+        html = """
+        <div class="section-box">
+        <table>
+        <thead>
+        """
 
-    for d in dimensions:
-        html += '<th class="blank-head"></th>'
-
-    html += f'''
-    <th class="measure-group" colspan="{len(measures)}">
-        Measures
-    </th>
-    '''
-
-    html += "</tr>"
-
-    # Second Header Row
-    html += "<tr>"
-
-    for col in ordered_cols:
-
-        if col in measures:
-            html += f'<th class="measure-col">{col}</th>'
-
-        else:
-            html += f'<th class="dimension-col">{col}</th>'
-
-    html += "</tr></thead>"
-
-    # Body
-    html += "<tbody>"
-
-    for _, row in df.iterrows():
-
+        # First Row
         html += "<tr>"
 
-        for col in ordered_cols:
-            html += f"<td>{row[col]}</td>"
+        for d in dimensions:
+            html += '<th class="blank-head"></th>'
+
+        html += f'''
+        <th class="measure-group" colspan="{len(measures)}">
+            Measures
+        </th>
+        '''
 
         html += "</tr>"
 
-    html += "</tbody></table></div>"
+        # Second Row
+        html += "<tr>"
 
-    # Display table
-    st.markdown(html, unsafe_allow_html=True)
+        for col in ordered_cols:
 
-    # Currency Conversion Section
+            if col in measures:
+                html += f'<th class="measure-col">{col}</th>'
+
+            else:
+                html += f'<th class="dimension-col">{col}</th>'
+
+        html += "</tr>"
+
+        html += "</thead><tbody>"
+
+        # Data Rows
+        for _, row in dataframe.iterrows():
+
+            html += "<tr>"
+
+            for col in ordered_cols:
+                html += f"<td>{row[col]}</td>"
+
+            html += "</tr>"
+
+        html += "</tbody></table></div>"
+
+        return html
+
+    # ---------------- ORIGINAL TABLE ----------------
+    st.subheader("Original Table")
+
     st.markdown(
-        """
-        <div class="currency-box">
-        """,
+        build_table(df),
+        unsafe_allow_html=True
+    )
+
+    # ---------------- CURRENCY SECTION ----------------
+    st.markdown(
+        '<div class="section-box">',
         unsafe_allow_html=True
     )
 
     st.subheader("Currency Conversion")
 
-    # Currency List
-    currencies = sorted(df["Currency"].dropna().unique())
+    # Check Currency Column
+    if "Currency" not in df.columns:
 
-    col1, col2 = st.columns(2)
-
-    with col1:
-        from_currency = st.selectbox(
-            "From Currency",
-            currencies
+        st.warning(
+            "Currency column not found in uploaded file."
         )
 
-    with col2:
-        to_currency = st.selectbox(
-            "To Currency",
-            currencies
+    else:
+
+        currencies = sorted(
+            df["Currency"].dropna().unique().tolist()
         )
 
-    # Numeric columns
-    numeric_cols = df.select_dtypes(
-        include=["int64", "float64"]
-    ).columns.tolist()
+        col1, col2 = st.columns(2)
 
-    # Amount column
-    amount_col = st.selectbox(
-        "Select Amount Column",
-        numeric_cols
-    )
-
-    # Convert Button
-    if st.button("Convert Currency"):
-
-        try:
-
-            # Currency API
-            c = CurrencyRates()
-
-            # Copy dataframe
-            converted_df = df.copy()
-
-            # Exchange Rate
-            rate = c.get_rate(
-                from_currency,
-                to_currency
+        with col1:
+            from_currency = st.selectbox(
+                "From Currency",
+                currencies
             )
 
-            # ONLY selected currency rows convert
-            mask = converted_df["Currency"] == from_currency
-
-            converted_df.loc[mask, amount_col] = (
-                converted_df.loc[mask, amount_col] * rate
-            ).round(2)
-
-            # Update currency column
-            converted_df.loc[mask, "Currency"] = to_currency
-
-            # Success message
-            st.success(
-                f"1 {from_currency} = {rate:.2f} {to_currency}"
+        with col2:
+            to_currency = st.selectbox(
+                "To Currency",
+                currencies
             )
 
-            # Rebuild SAC Table
-            html2 = """
-            <div class="table-wrapper">
-            <table>
-            <thead>
-            """
+        # Numeric Columns
+        numeric_cols = df.select_dtypes(
+            include=["int64", "float64"]
+        ).columns.tolist()
 
-            html2 += "<tr>"
+        # Amount Column
+        amount_col = st.selectbox(
+            "Select Amount Column",
+            numeric_cols
+        )
 
-            for d in dimensions:
-                html2 += '<th class="blank-head"></th>'
+        # ---------------- CONVERT BUTTON ----------------
+        if st.button("Convert Currency"):
 
-            html2 += f'''
-            <th class="measure-group" colspan="{len(measures)}">
-                Measures
-            </th>
-            '''
+            try:
 
-            html2 += "</tr>"
+                converted_df = df.copy()
 
-            html2 += "<tr>"
+                # IMPORTANT FIX
+                converted_df[amount_col] = pd.to_numeric(
+                    converted_df[amount_col],
+                    errors="coerce"
+                ).astype(float)
 
-            for col in ordered_cols:
+                # Currency API
+                c = CurrencyRates()
 
-                if col in measures:
-                    html2 += f'<th class="measure-col">{col}</th>'
+                # Get Exchange Rate
+                rate = c.get_rate(
+                    from_currency,
+                    to_currency
+                )
 
-                else:
-                    html2 += f'<th class="dimension-col">{col}</th>'
+                # Convert ONLY selected currency rows
+                mask = (
+                    converted_df["Currency"]
+                    == from_currency
+                )
 
-            html2 += "</tr></thead>"
+                converted_df.loc[
+                    mask,
+                    amount_col
+                ] = (
+                    converted_df.loc[
+                        mask,
+                        amount_col
+                    ] * rate
+                ).round(2)
 
-            html2 += "<tbody>"
+                # Update currency
+                converted_df.loc[
+                    mask,
+                    "Currency"
+                ] = to_currency
 
-            for _, row in converted_df.iterrows():
+                # Success Message
+                st.success(
+                    f"1 {from_currency} = "
+                    f"{rate:.2f} {to_currency}"
+                )
 
-                html2 += "<tr>"
+                # Converted Table
+                st.subheader("Converted Table")
 
-                for col in ordered_cols:
-                    html2 += f"<td>{row[col]}</td>"
+                st.markdown(
+                    build_table(converted_df),
+                    unsafe_allow_html=True
+                )
 
-                html2 += "</tr>"
-
-            html2 += "</tbody></table></div>"
-
-            st.subheader("Converted Table")
-
-            st.markdown(html2, unsafe_allow_html=True)
-
-        except Exception as e:
-            st.error(f"Error: {e}")
+            except Exception as e:
+                st.error(f"Conversion Error: {e}")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
